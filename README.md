@@ -1,18 +1,75 @@
 Redmine WebHook Plugin
 ======================
 
-A Redmine plugin posts webhook on creating and updating tickets.
+Maintained fork of the plugin originally created by @suer. Posts optional
+HMAC-signed webhooks for issue and time entry events. 
+
+Beware: AI involved a lot!
+
+Development tests
+------------------------------
+The test environment runs entirely in Docker and pins the production Redmine
+version. No host Ruby installation is required.
+
+Run the plugin test suite:
+
+    docker compose -f compose.test.yml run --rm --build plugin-test
+
+Check every Ruby source file with the same Ruby minor version as production:
+
+    docker compose -f compose.test.yml run --rm ruby31-syntax
+
+The integration image is the official `redmine:5.1.6` image and exercises
+Rails 6.1.7.10 with PostgreSQL. It also sends a real request to a disposable
+HTTP receiver and verifies the path, content type and JSON body. Docker
+currently publishes that immutable Redmine tag with Ruby 3.2.7, so the
+additional Ruby 3.1.2 parser check guards compatibility with the production
+interpreter.
+
+Start a disposable Redmine instance and HTTP webhook receiver:
+
+    docker compose -f compose.test.yml up --build redmine receiver
+
+Redmine is exposed at `http://localhost:13000`. The receiver is only available
+inside the Compose network at `http://receiver:8080`; its captured requests can
+be read from `http://receiver:8080/events` by another service in that network.
+
+Webhook signatures
+------------------------------
+Set the same secret in Redmine and in the webhook receiver:
+
+    REDMINE_WEBHOOK_SECRET=<random secret>
+
+A suitable secret can be generated with:
+
+    openssl rand -hex 32
+
+When the variable is present, every request includes these headers:
+
+    X-Redmine-Webhook-Id: <delivery UUID>
+    X-Redmine-Webhook-Timestamp: <Unix timestamp>
+    X-Redmine-Webhook-Signature: sha256=<hex digest>
+
+The signature is `HMAC-SHA256(secret, timestamp + "." + delivery_id + "." +
+raw_request_body)`. The receiver should compare it in constant time, reject old
+timestamps and remember delivery IDs for the accepted time window to prevent
+replays. When `REDMINE_WEBHOOK_SECRET` is absent, requests remain unsigned for
+backward compatibility.
 
 Author
 ------------------------------
 * @suer
+
+Fork
+------------------------------
+* @graimes
 
 Install
 ------------------------------
 Type below commands:
 
     $ cd $RAILS_ROOT/plugins
-    $ git clone https://github.com/suer/redmine_webhook.git
+    $ git clone https://github.com/Graimes/redmine_webhook_2026.git redmine_webhook
     $ rake redmine:plugins:migrate RAILS_ENV=production
 
 Then, restart your redmine.

@@ -43,6 +43,10 @@ module RedmineWebhook
       post(webhooks, journal_to_json(issue, journal, controller))
     end
 
+    def controller_timelog_edit_before_save(context = {})
+      context[:time_entry].redmine_webhook_skip = true if skip_webhooks(context)
+    end
+
     def model_changeset_scan_commit_for_issue_ids_pre_issue_update(context = {})
       issue = context[:issue]
       journal = issue.current_journal
@@ -75,17 +79,11 @@ module RedmineWebhook
     end
 
     def post(webhooks, request_body)
-      Thread.start do
-        webhooks.each do |webhook|
-          begin
-            Faraday.post do |req|
-              req.url webhook.url
-              req.headers['Content-Type'] = 'application/json'
-              req.body = request_body
-            end
-          rescue => e
-            Rails.logger.error e
-          end
+      webhooks.where.not(:url => [nil, '']).pluck(:url).each do |url|
+        begin
+          RedmineWebhook::DeliveryJob.perform_later(url, request_body)
+        rescue => e
+          Rails.logger.error e
         end
       end
     end
