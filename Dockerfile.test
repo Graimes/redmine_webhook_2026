@@ -1,0 +1,16 @@
+FROM redmine:5.1.6
+
+USER root
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /usr/src/redmine/plugins/redmine_webhook
+COPY Gemfile /usr/src/redmine/plugins/redmine_webhook/Gemfile
+
+RUN bundle config unset without \
+    && bundle config set --local with 'development test' \
+    && bundle install
+
+COPY . /usr/src/redmine/plugins/redmine_webhook

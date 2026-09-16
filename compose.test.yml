@@ -1,0 +1,79 @@
+services:
+  ruby31-syntax:
+    image: ruby:3.1.2-slim
+    working_dir: /plugin
+    volumes:
+      - .:/plugin:ro
+    command:
+      - bash
+      - -lc
+      - find . -name '*.rb' -print0 | xargs -0 -n1 ruby -c
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: redmine
+      POSTGRES_USER: redmine
+      POSTGRES_PASSWORD: redmine-test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redmine -d redmine"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  receiver:
+    image: python:3.14-slim
+    command: ["python", "/receiver.py"]
+    volumes:
+      - ./test/support/receiver.py:/receiver.py:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  plugin-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      RAILS_ENV: test
+      REDMINE_DB_POSTGRES: db
+      REDMINE_DB_DATABASE: redmine_test
+      REDMINE_DB_USERNAME: redmine
+      REDMINE_DB_PASSWORD: redmine-test
+      SECRET_KEY_BASE: redmine-webhook-test-secret
+      DISABLE_DATABASE_ENVIRONMENT_CHECK: "1"
+      WEBHOOK_RECEIVER_URL: http://receiver:8080
+      REDMINE_WEBHOOK_SECRET: test-webhook-secret
+    depends_on:
+      db:
+        condition: service_healthy
+      receiver:
+        condition: service_healthy
+    command:
+      - rake
+      - db:drop
+      - db:create
+      - db:migrate
+      - redmine:plugins:migrate
+      - test
+      - TEST=plugins/redmine_webhook/test
+
+  redmine:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      REDMINE_DB_POSTGRES: db
+      REDMINE_DB_DATABASE: redmine
+      REDMINE_DB_USERNAME: redmine
+      REDMINE_DB_PASSWORD: redmine-test
+      SECRET_KEY_BASE: redmine-webhook-test-secret
+    ports:
+      - "13000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      receiver:
+        condition: service_healthy
