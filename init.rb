@@ -17,7 +17,7 @@ Redmine::Plugin.register :redmine_webhook do
   name 'Redmine Webhook plugin'
   author 'suer / graimes + llm'
   description 'Posts signed webhooks for issue and time entry events'
-  version '0.1.0'
+  version '0.1.1'
   url 'https://github.com/Graimes/redmine_webhook_2026'
   author_url 'http://d.hatena.ne.jp/suer'
   project_module :webhooks do

@@ -25,9 +25,22 @@ module RedmineWebhook
         :status => RedmineWebhook::StatusWrapper.new(@issue.status).to_hash,
         :tracker => RedmineWebhook::TrackerWrapper.new(@issue.tracker).to_hash,
         :priority => RedmineWebhook::PriorityWrapper.new(@issue.priority).to_hash,
+        :fixed_version => fixed_version,
         :author => RedmineWebhook::AuthorWrapper.new(@issue.author).to_hash,
         :assignee => RedmineWebhook::AuthorWrapper.new(@issue.assigned_to).to_hash,
         :watchers => @issue.watcher_users.collect{|u| RedmineWebhook::AuthorWrapper.new(u).to_hash}
+      }
+    end
+
+    private
+
+    def fixed_version
+      return nil unless @issue.fixed_version
+
+      {
+        :id => @issue.fixed_version.id,
+        :name => @issue.fixed_version.name,
+        :status => @issue.fixed_version.status
       }
     end
   end
