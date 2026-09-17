@@ -12,11 +12,10 @@ module RedmineWebhook
       return if skip_webhooks(context)
       issue = context[:issue]
       controller = context[:controller]
-      project = issue.project
-      webhooks = Webhook.where(:project_id => project.project.id)
-      webhooks = Webhook.where(:project_id => 0) unless webhooks && webhooks.length > 0
-      return unless webhooks
-      post(webhooks, issue_to_json(issue, controller))
+      RedmineWebhook::Publisher.publish(
+        issue.project,
+        issue_to_json(issue, controller)
+      )
     end
 
     def controller_issues_edit_after_save(context = {})
@@ -24,11 +23,10 @@ module RedmineWebhook
       journal = context[:journal]
       controller = context[:controller]
       issue = context[:issue]
-      project = issue.project
-      webhooks = Webhook.where(:project_id => project.project.id)
-      webhooks = Webhook.where(:project_id => 0) unless webhooks && webhooks.length > 0
-      return unless webhooks
-      post(webhooks, journal_to_json(issue, journal, controller))
+      RedmineWebhook::Publisher.publish(
+        issue.project,
+        journal_to_json(issue, journal, controller)
+      )
     end
 
     def controller_issues_bulk_edit_after_save(context = {})
@@ -36,11 +34,10 @@ module RedmineWebhook
       journal = context[:journal]
       controller = context[:controller]
       issue = context[:issue]
-      project = issue.project
-      webhooks = Webhook.where(:project_id => project.project.id)
-      webhooks = Webhook.where(:project_id => 0) unless webhooks && webhooks.length > 0
-      return unless webhooks
-      post(webhooks, journal_to_json(issue, journal, controller))
+      RedmineWebhook::Publisher.publish(
+        issue.project,
+        journal_to_json(issue, journal, controller)
+      )
     end
 
     def controller_timelog_edit_before_save(context = {})
@@ -50,10 +47,10 @@ module RedmineWebhook
     def model_changeset_scan_commit_for_issue_ids_pre_issue_update(context = {})
       issue = context[:issue]
       journal = issue.current_journal
-      webhooks = Webhook.where(:project_id => issue.project.project.id)
-      webhooks = Webhook.where(:project_id => 0) unless webhooks && webhooks.length > 0
-      return unless webhooks
-      post(webhooks, journal_to_json(issue, journal, nil))
+      RedmineWebhook::Publisher.publish(
+        issue.project,
+        journal_to_json(issue, journal, nil)
+      )
     end
 
     private
@@ -78,14 +75,5 @@ module RedmineWebhook
       }.to_json
     end
 
-    def post(webhooks, request_body)
-      webhooks.where.not(:url => [nil, '']).pluck(:url).each do |url|
-        begin
-          RedmineWebhook::DeliveryJob.perform_later(url, request_body)
-        rescue => e
-          Rails.logger.error e
-        end
-      end
-    end
   end
 end

@@ -2,16 +2,31 @@ module RedmineWebhook
   class Publisher
     class << self
       def publish(project, request_body)
-        webhook_scope(project).where.not(:url => [nil, '']).pluck(:url).each do |url|
-          RedmineWebhook::DeliveryJob.perform_later(url, request_body)
+        urls_for(project).each do |url|
+          begin
+            RedmineWebhook::DeliveryJob.perform_later(url, request_body)
+          rescue => error
+            Rails.logger.error error
+          end
         end
       end
 
-      private
+      def urls_for(project)
+        project_ids = [project.id] + project.ancestors.reverse.map(&:id)
+        urls = project_ids.flat_map do |project_id|
+          Webhook.where(:project_id => project_id)
+                 .where.not(:url => [nil, ''])
+                 .order(:id)
+                 .pluck(:url)
+        end
+        if urls.empty?
+          urls = Webhook.where(:project_id => 0)
+                        .where.not(:url => [nil, ''])
+                        .order(:id)
+                        .pluck(:url)
+        end
 
-      def webhook_scope(project)
-        project_webhooks = Webhook.where(:project_id => project.id)
-        project_webhooks.exists? ? project_webhooks : Webhook.where(:project_id => 0)
+        urls.uniq
       end
     end
   end

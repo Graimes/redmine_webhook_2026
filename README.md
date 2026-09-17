@@ -56,6 +56,12 @@ timestamps and remember delivery IDs for the accepted time window to prevent
 replays. When `REDMINE_WEBHOOK_SECRET` is absent, requests remain unsigned for
 backward compatibility.
 
+Webhook inheritance
+------------------------------
+Project webhooks also apply to its subprojects. A subproject may add its own
+webhooks; identical URLs in the project hierarchy are delivered only once.
+The global webhook is used only when none is configured in that hierarchy.
+
 Author
 ------------------------------
 * @suer
